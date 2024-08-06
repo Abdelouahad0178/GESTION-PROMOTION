@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GESTION DE PROMOTION</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="manifest" href="manifest.json">
+  
+  <style>
+    
+
+    @media print {
+      body * {
+          visibility: hidden;
+      }
+      #alertsTableContainer, #alertsTableContainer * {
+          visibility: visible;
+      }
+      #alertsTableContainer {
+          position: absolute;
+          left: 0;
+          top: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>GESTION DE PROMOTION</h1>
+    <button id="triggerAlertsButton">Déclencher les alertes</button>
+    <input type="text" id="searchInput" placeholder="Recherche par lettre...">
+    <table id="stockTable" class="hidden">
+      <thead>
+        <tr>
+          <th>REF</th>
+          <th>Article</th>
+          <th>Stock</th>
+          <th>Prix</th>
+          <th>Date d'entrée</th>
+          <th>Total</th>
+        </tr>
+      </thead>
+      <tbody id="stockList">
+        <!-- La liste des produits ajoutés apparaîtra ici -->
+      </tbody>
+    </table>
+
+    <div id="alertsTableContainer">
+      <h2>Alertes</h2>
+      <table id="alertsTable">
+        <thead>
+          <tr>
+            <th>Article</th>
+            <th>Stock</th>
+            <th>Période Stock</th>
+          </tr>
+        </thead>
+        <tbody id="alertsList">
+          <!-- Les alertes apparaîtront ici -->
+        </tbody>
+      </table>
+    </div>
+    
+    <!-- Bouton pour imprimer -->
+    <button id="printButton" >Imprimer</button>
+  </div>
+
+  <!-- Popup pour afficher les détails de l'article -->
+  <div id="popup">
+    <div id="popupContent">
+      <span id="closePopup">&times;</span>
+      <img id="popupImage" src="" alt="Article Image">
+      <div id="popupDetails"></div>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const stockList = document.getElementById('stockList');
+        const searchInput = document.getElementById('searchInput');
+        const triggerAlertsButton = document.getElementById('triggerAlertsButton');
+        const alertsList = document.getElementById('alertsList');
+        const popup = document.getElementById('popup');
+        const popupContent = document.getElementById('popupContent');
+        const closePopup = document.getElementById('closePopup');
+        let alertsVisible = false;
+        let lastHighlightedRow = null; // Pour stocker la dernière ligne en surbrillance
+
+        // Fonction pour charger les données de stock depuis un fichier JSON
+        function loadStockFromJSON() {
+            fetch('/merged.json')
+                .then(response => response.json())
+                .then(data => {
+                    data.forEach((item) => {
+                        const { ref, article, stock, prix, date_entree_fichier_json, image } = item;
+                        const total = (stock * prix).toFixed(2);
+                        addStockItem(ref, article, stock, prix, date_entree_fichier_json, total);
+                    });
+                })
+                .catch(error => console.error('Error loading stock data:', error));
+        }
+
+        // Fonction pour ajouter un article au tableau de stock
+        function addStockItem(ref, article, stock, prix, dateEntered, total) {
+            const tableRow = document.createElement('tr');
+            tableRow.innerHTML = `
+                <td>${ref}</td>
+                <td>${article}</td>
+                <td>${stock}</td>
+                <td>${prix}</td>
+                <td>${dateEntered}</td>
+                <td>${total}</td>
+            `;
+            stockList.appendChild(tableRow);
+        }
+
+        // Fonction pour calculer la différence de date
+        function calculateDateDifference(dateEntered) {
+            const today = new Date();
+            const entryDate = new Date(dateEntered);
+            const differenceInTime = today.getTime() - entryDate.getTime();
+            return Math.floor(differenceInTime / (1000 * 3600 * 24)); // Convert milliseconds to days
+        }
+
+        // Fonction pour vérifier la promotion
+        function checkForPromotion(article, dateEntered) {
+            const dateDifference = calculateDateDifference(dateEntered);
+            if (dateDifference > 90) {
+                return `${dateDifference} jours`;
+            }
+            return null;
+        }
+
+        // Fonction pour vérifier le niveau de stock
+        function checkStockLevel(article, stock) {
+            if (stock < 50 && stock >= 20) {
+                return `<span class="stock-low">${stock}</span>`;
+            }
+            if (stock < 20) {
+                return `<span class="stock-critical">${stock}</span>`;
+            }
+            return null;
+        }
+
+        // Fonction pour ajouter une alerte au tableau d'alertes
+        function addAlertToTable(article, stockMessage, periodMessage) {
+            const alertRow = document.createElement('tr');
+            alertRow.innerHTML = `
+                <td>${article}</td>
+                <td>${stockMessage}</td>
+                <td>${periodMessage}</td>
+            `;
+            alertsList.appendChild(alertRow);
+        }
+
+        // Ajoute un écouteur d'événements sur le clic pour chaque ligne du tableau des alertes
+        alertsList.addEventListener('click', function(event) {
+            const clickedRow = event.target.closest('tr');
+            if (clickedRow) {
+                const article = clickedRow.querySelector('td:nth-child(1)').textContent;
+                const stock = clickedRow.querySelector('td:nth-child(2)').textContent;
+                const period = clickedRow.querySelector('td:nth-child(3)').textContent;
+
+                // Modifier le contenu du popup avec les détails de l'article cliqué
+                // Ici, vous pouvez ajouter l'image de l'article, la référence, le prix, etc.
+                // Je vais simplement afficher le texte pour le moment.
+                popupDetails.innerHTML = `
+                    <p>Référence: ${article}cm</p>
+                    <p>Stock: ${stock}</p>
+                    <p>Période de Stock: ${period}</p>
+                `;
+
+                // Afficher l'image de l'article
+                const imageURL = `images/${article}.jpg`; // Supposons que les images soient stockées dans un dossier nommé "images"
+                popupImage.src = imageURL;
+
+                // Afficher le popup
+                popup.style.display = 'block';
+            }
+        });
+
+        // Ajoute un écouteur d'événements sur le bouton pour fermer le popup
+        closePopup.addEventListener('click', function() {
+            popup.style.display = 'none';
+        });
+
+        // Ajoute un écouteur d'événements sur le clic du bouton pour déclencher les alertes
+        triggerAlertsButton.addEventListener('click', function() {
+            alertsVisible = !alertsVisible;
+            if (alertsVisible) {
+                fetch('/merged.json')
+                    .then(response => response.json())
+                    .then(data => {
+                        alertsList.innerHTML = ''; // Effacer les alertes existantes
+                        let hasAlerts = false;
+                        data.forEach(item => {
+                            const stockAlert = checkStockLevel(item.article, item.stock);
+                            const promotionAlert = checkForPromotion(item.article, item.date_entree_fichier_json);
+                            if (stockAlert) {
+                                hasAlerts = true;
+                                addAlertToTable(item.article, stockAlert, '');
+                            }
+                            if (promotionAlert) {
+                                hasAlerts = true;
+                                addAlertToTable(item.article, '', promotionAlert);
+                            }
+                        });
+                        // Correction : Utilisation de `alertsList` au lieu de `alertsTableBody`
+                        alertsList.style.display = hasAlerts ? 'table-row-group' : 'none';
+                    })
+                    .catch(error => console.error('Error loading stock data:', error));
+            } else {
+                alertsList.innerHTML = '';
+                // Correction : Utilisation de `alertsList` au lieu de `alertsTableBody`
+                alertsList.style.display = 'none';
+            }
+        });
+
+        // Ajoute un écouteur d'événements sur l'input de recherche pour filtrer les résultats du tableau
+        searchInput.addEventListener('input', function() {
+            const searchValue = searchInput.value.toLowerCase();
+            const stockItems = stockList.querySelectorAll('tr');
+            let hasResults = false;
+            stockItems.forEach(function(item) {
+                const article = item.querySelector('td:nth-child(2)').textContent.toLowerCase();
+                const isVisible = article.includes(searchValue);
+                item.style.display = isVisible ? '' : 'none';
+                if (isVisible) hasResults = true;
+            });
+            stockTable.style.display = (searchValue && hasResults) ? 'table' : 'none';
+        });
+
+        // Bouton d'impression
+        const printButton = document.getElementById('printButton');
+        printButton.addEventListener('click', function() {
+            window.print();
+        });
+
+        // Charger les données de stock au chargement de la page
+        loadStockFromJSON();
+    });
+
+    // Ajoute un écouteur d'événements pour détecter le défilement de la page
+    window.addEventListener('scroll', function() {
+        const alertsRows = document.querySelectorAll('#alertsList tr');
+        const scrollPosition = window.scrollY;
+
+        // Enlever la classe highlight de la dernière ligne en surbrillance
+        if (lastHighlightedRow) {
+            lastHighlightedRow.classList.remove('highlight');
+        }
+
+        // Trouver la première ligne dans la vue et lui ajouter la classe highlight
+        alertsRows.forEach(function(row, index) {
+            const rowPosition = row.getBoundingClientRect().top + window.scrollY;
+            if (rowPosition < scrollPosition + window.innerHeight && rowPosition + row.offsetHeight > scrollPosition) {
+                row.classList.add('highlight');
+                lastHighlightedRow = row; // Mettre à jour la dernière ligne en surbrillance
+                return; // Sortir de la boucle après avoir trouvé la première ligne dans la vue
+            }
+        });
+    });
+  </script>
+</body>
+</html>

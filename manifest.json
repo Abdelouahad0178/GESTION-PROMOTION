@@ -1,0 +1,29 @@
+{
+    "short_name": "MAISON CARRELAGE",
+    "name": " GESTION PROMOTION",
+    "display": "standalone",
+    
+    "orientation": "portrait",
+    "scope": "/",
+    "start_url": "index.html",
+    "splash_pages": null,
+
+    "icons": [
+        {
+            "src": "./RECHERCHE1.png",
+            "sizes": "256x256",
+            "type": "image/png"
+            
+        },
+        {
+            "src": "./RECHERCHE1.png",
+            "sizes": "256x256",
+            "type": "image/png",
+            "purpose": "maskable"
+            
+        }
+       
+
+
+    ]
+}
